@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hello World - Flask 一頁式網站</title>
+    <!-- 引入 Bootstrap 5 CDN 美化版面 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <style>
+        :root {
+            --primary-gradient: linear-gradient(135deg, #0d6efd 0%, #0dcaf0 100%);
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans TC", sans-serif;
+            scroll-behavior: smooth;
+            background-color: #f8f9fa;
+        }
+        .hero-section {
+            background: var(--primary-gradient);
+            color: white;
+            padding: 100px 0 80px 0;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .feature-card {
+            border: none;
+            border-radius: 1rem;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            box-shadow: 0 6px 15px rgba(0,0,0,0.05);
+        }
+        .feature-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 25px rgba(0,0,0,0.12);
+        }
+        .interactive-box {
+            background: white;
+            border-radius: 1rem;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+            padding: 2.5rem;
+        }
+        footer {
+            background-color: #212529;
+            color: #adb5bd;
+            padding: 30px 0;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 導航列 (Navbar) -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark sticky-top shadow-sm">
+        <div class="container">
+            <a class="navbar-brand fw-bold" href="#">
+                <i class="bi bi-code-slash text-info me-2"></i>Flask Hello World
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item"><a class="nav-link" href="#hero">首頁</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#features">框架特色</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#interactive">即時互動</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#about">關於</a></li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero 標題區塊 -->
+    <section id="hero" class="hero-section text-center">
+        <div class="container">
+            <span class="badge bg-light text-primary px-3 py-2 rounded-pill mb-3 fw-semibold shadow-sm">
+                Python Flask Web Framework
+            </span>
+            <h1 class="display-3 fw-bold mb-3">Hello, World!</h1>
+            <p class="lead mb-4 fs-4 text-white-50">
+                歡迎來到使用 Python Flask 打造的現代化一頁式響應網站
+            </p>
+            <div class="d-flex justify-content-center gap-3">
+                <a href="#interactive" class="btn btn-light btn-lg px-4 fw-bold shadow-sm">立即體驗互動</a>
+                <a href="#features" class="btn btn-outline-light btn-lg px-4">了解特色</a>
+            </div>
+            <p class="mt-4 small text-light opacity-75">
+                <i class="bi bi-clock me-1"></i>伺服器連線時間：<span class="fw-bold">{{ server_time }}</span>
+            </p>
+        </div>
+    </section>
+
+    <!-- 特色介紹區塊 (Features) -->
+    <section id="features" class="py-5">
+        <div class="container py-4">
+            <div class="text-center mb-5">
+                <h2 class="fw-bold">為什麼選擇 Flask？</h2>
+                <p class="text-muted">輕巧靈活、簡約高效的 Python Web 核心框架</p>
+            </div>
+            <div class="row g-4">
+                <div class="col-md-4">
+                    <div class="card h-100 feature-card p-4 text-center">
+                        <div class="fs-1 text-primary mb-3">
+                            <i class="bi bi-feather"></i>
+                        </div>
+                        <h4 class="fw-bold">輕量微框架</h4>
+                        <p class="text-muted mb-0">沒有過多預設綁定，保留極高自由度，隨心所欲挑選適合的套件與工具。</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card h-100 feature-card p-4 text-center">
+                        <div class="fs-1 text-success mb-3">
+                            <i class="bi bi-lightning-charge"></i>
+                        </div>
+                        <h4 class="fw-bold">快速開發上線</h4>
+                        <p class="text-muted mb-0">只需幾行程式碼即可啟動 Web 服務，無論是原型驗證還是微服務 API 都非常快速。</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card h-100 feature-card p-4 text-center">
+                        <div class="fs-1 text-info mb-3">
+                            <i class="bi bi-diagram-3"></i>
+                        </div>
+                        <h4 class="fw-bold">強大的生態系</h4>
+                        <p class="text-muted mb-0">基於 Werkzeug 與 Jinja2 模板引擎，並有豐富的擴展套件社群支援。</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 即時互動區塊 (Interactive Section) -->
+    <section id="interactive" class="py-5 bg-white">
+        <div class="container py-4">
+            <div class="row justify-content-center">
+                <div class="col-lg-8">
+                    <div class="interactive-box">
+                        <div class="text-center mb-4">
+                            <h3 class="fw-bold"><i class="bi bi-chat-dots text-primary me-2"></i>即時問候互動體驗</h3>
+                            <p class="text-muted">輸入您的名字，透過 AJAX 向 Flask 後端 API 發送請求並即時回傳問候！</p>
+                        </div>
+                        <div class="input-group input-group-lg mb-3">
+                            <input type="text" id="userNameInput" class="form-control" placeholder="請輸入您的名字或暱稱 (例如：季老師)..." />
+                            <button class="btn btn-primary px-4" id="sendBtn" type="button">
+                                <i class="bi bi-send me-1"></i>發送問候
+                            </button>
+                        </div>
+                        <!-- 回應顯示卡片 -->
+                        <div id="resultBox" class="alert alert-success d-none mt-3 shadow-sm" role="alert">
+                            <h5 class="alert-heading fw-bold"><i class="bi bi-check-circle-fill me-2"></i>後端回應：</h5>
+                            <p id="resultMessage" class="fs-5 mb-1"></p>
+                            <hr>
+                            <p class="mb-0 small text-muted">回應時間戳記：<span id="resultTime"></span></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 關於與代碼說明區塊 (About) -->
+    <section id="about" class="py-5 bg-light">
+        <div class="container py-4">
+            <div class="text-center mb-4">
+                <h3 class="fw-bold">專案結構說明</h3>
+                <p class="text-muted">簡潔明瞭的標準 Flask 單頁專案目錄配置</p>
+            </div>
+            <div class="row justify-content-center">
+                <div class="col-lg-6">
+                    <div class="bg-dark text-light p-4 rounded-3 shadow-sm">
+                        <pre class="mb-0"><code class="text-info">0929季老師/
+├── app.py                # Flask 主程式 (路由與 API 邏輯)
+├── requirements.txt      # Python 相依套件列表
+├── templates/
+│   └── index.html        # 一頁式網站 HTML 模板
+└── README.md             # 專案執行與操作教學說明</code></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 頁尾 (Footer) -->
+    <footer class="text-center">
+        <div class="container">
+            <p class="mb-1">© 2026 Flask Hello World 一頁式網站示範</p>
+            <p class="small text-secondary mb-0">Powered by Python 3 & Flask Framework</p>
+        </div>
+    </footer>
+
+    <!-- Bootstrap 與互動腳本 -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.getElementById('sendBtn').addEventListener('click', function() {
+            const name = document.getElementById('userNameInput').value;
+            
+            fetch('/api/greet', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ name: name })
+            })
+            .then(res => res.json())
+            .then(data => {
+                const resultBox = document.getElementById('resultBox');
+                const resultMessage = document.getElementById('resultMessage');
+                const resultTime = document.getElementById('resultTime');
+                
+                resultMessage.textContent = data.message;
+                resultTime.textContent = data.timestamp;
+                resultBox.classList.remove('d-none');
+            })
+            .catch(err => {
+                console.error('Error:', err);
+                alert('與伺服器通訊失敗，請確認 Flask 伺服器正在運行！');
+            });
+        });
+
+        // 支援 Enter 鍵送出
+        document.getElementById('userNameInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                document.getElementById('sendBtn').click();
+            }
+        });
+    </script>
+</body>
+</html>
