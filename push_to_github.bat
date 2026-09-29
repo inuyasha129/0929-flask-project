@@ -8,6 +8,8 @@ echo   儲存庫: https://github.com/inuyasha129/0929-flask-project.git
 echo ==================================================
 echo.
 
+set "PATH=%LOCALAPPDATA%\Programs\Git\cmd;%LOCALAPPDATA%\Programs\Git\ucrt64\bin;%PATH%"
+
 git push -u origin main
 
 if %ERRORLEVEL% EQU 0 (
