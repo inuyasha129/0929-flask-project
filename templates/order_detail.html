@@ -1,0 +1,223 @@
+{% extends 'base.html' %}
+
+{% block title %}出貨單 {{ order['order_id'] }}{% endblock %}
+
+{% block content %}
+<div class="container py-3">
+
+  <!-- 頂部操作工具列 (列印時自動隱藏) -->
+  <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-3 mb-4 no-print">
+    <div class="d-flex align-items-center gap-2">
+      <a href="{{ url_for('orders_list') }}" class="btn btn-outline-secondary rounded-pill px-3">
+        <i class="bi bi-arrow-left me-1"></i> 返回訂單列表
+      </a>
+      <span class="text-muted">|</span>
+      <span class="small text-muted">專屬訂單網址：<code>/order/{{ order['order_id'] }}</code></span>
+    </div>
+
+    <div class="d-flex align-items-center gap-2">
+      <!-- 快速變更狀態 -->
+      <select class="form-select form-select-sm" id="detailStatusSelect" style="width: 140px;">
+        <option value="處理中" {% if order['status'] == '處理中' %}selected{% endif %}>⏳ 處理中</option>
+        <option value="已出貨" {% if order['status'] == '已出貨' %}selected{% endif %}>🚚 已出貨</option>
+        <option value="已完成" {% if order['status'] == '已完成' %}selected{% endif %}>✅ 已完成</option>
+        <option value="已取消" {% if order['status'] == '已取消' %}selected{% endif %}>❌ 已取消</option>
+      </select>
+
+      <button type="button" class="btn btn-primary rounded-pill px-4 shadow-sm" onclick="window.print();">
+        <i class="bi bi-printer-fill me-1"></i> 列印出貨單
+      </button>
+    </div>
+  </div>
+
+  <!-- 出貨單實體卡片 (Print-ready) -->
+  <div class="shipping-invoice">
+    
+    <!-- 出貨單表頭 -->
+    <div class="shipping-header d-flex flex-column flex-md-row justify-content-between align-items-md-start gap-4">
+      <div>
+        <div class="d-flex align-items-center gap-2 mb-2">
+          <div class="bg-primary text-white p-2 rounded-3 d-inline-flex align-items-center justify-content-center" style="width: 38px; height: 38px;">
+            <i class="bi bi-truck-front-fill fs-5"></i>
+          </div>
+          <h3 class="fw-bold mb-0 text-dark">正航聯運 · 出貨裝箱單</h3>
+        </div>
+        <p class="text-muted small mb-1">訂單管理系統 (OrderMaster Pro) 自動生成之有效出貨憑單</p>
+        <div class="small text-secondary">
+          <span>出貨單號：<strong class="text-dark">{{ order['order_id'] }}</strong></span>
+          <span class="ms-3">下單日期：<strong class="text-dark">{{ order['order_date'] }}</strong></span>
+        </div>
+      </div>
+
+      <!-- 出貨單專屬 QRCode (Requirement 9) -->
+      <div class="text-center">
+        <div class="qr-container shadow-sm">
+          <img src="{{ qr_b64 }}" alt="出貨單 QRCode - {{ order['order_id'] }}">
+          <div class="small fw-semibold text-muted mt-1" style="font-size: 0.72rem;">
+            <i class="bi bi-qr-code-scan me-1"></i> 掃碼查驗出貨單
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 訂單與客戶資訊區塊 -->
+    <div class="row g-3 mb-4">
+      <div class="col-md-7">
+        <div class="p-3 bg-light rounded-3 border h-100">
+          <h6 class="fw-bold text-dark mb-2"><i class="bi bi-building me-1 text-primary"></i> 收件客戶資料</h6>
+          <div class="mb-1">
+            <span class="text-muted small">客戶名稱：</span>
+            <strong class="text-dark">{{ order['customer_name'] }}</strong>
+            <span class="badge bg-light text-secondary border ms-1">{{ order['customer_id'] }}</span>
+          </div>
+          <div class="mb-1">
+            <span class="text-muted small">聯絡電話：</span>
+            <span class="text-dark">{{ order['customer_phone'] }}</span>
+          </div>
+          <div>
+            <span class="text-muted small">送貨地址：</span>
+            <span class="text-dark">{{ order['customer_address'] }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-5">
+        <div class="p-3 bg-light rounded-3 border h-100">
+          <h6 class="fw-bold text-dark mb-2"><i class="bi bi-info-circle me-1 text-primary"></i> 訂單狀態資訊</h6>
+          <div class="mb-2">
+            <span class="text-muted small">負責業務：</span>
+            <strong class="text-dark">{{ order['salesperson'] }}</strong>
+          </div>
+          <div class="mb-2">
+            <span class="text-muted small">目前狀態：</span>
+            {% if order['status'] == '處理中' %}
+              <span class="badge-status badge-status-processing" id="detailStatusBadge">⏳ 處理中</span>
+            {% elif order['status'] == '已出貨' %}
+              <span class="badge-status badge-status-shipped" id="detailStatusBadge">🚚 已出貨</span>
+            {% elif order['status'] == '已完成' %}
+              <span class="badge-status badge-status-completed" id="detailStatusBadge">✅ 已完成</span>
+            {% else %}
+              <span class="badge-status badge-status-cancelled" id="detailStatusBadge">❌ 已取消</span>
+            {% endif %}
+          </div>
+          <div class="small text-muted">
+            建立時間：{{ order['created_at'] }}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 訂購商品明細表格 (Requirement 7: 顯示下單當時之單價) -->
+    <div class="table-responsive mb-4">
+      <table class="table table-bordered align-middle">
+        <thead class="table-light">
+          <tr>
+            <th class="text-center" style="width: 50px;">項次</th>
+            <th>商品編號</th>
+            <th>商品名稱</th>
+            <th>商品分類</th>
+            <th class="text-end">下單當時單價</th>
+            <th class="text-center" style="width: 80px;">數量</th>
+            <th class="text-end" style="width: 140px;">小計 (NT$)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for idx, item in enumerate(items, 1) %}
+          <tr>
+            <td class="text-center text-muted small">{{ idx }}</td>
+            <td><code>{{ item['product_id'] }}</code></td>
+            <td class="fw-semibold text-dark">{{ item['product_name'] }}</td>
+            <td><span class="badge bg-light text-secondary border">{{ item['category'] }}</span></td>
+            <td class="text-end">NT$ {{ "{:,.0f}".format(item['price']) }}</td>
+            <td class="text-center fw-bold">{{ item['quantity'] }}</td>
+            <td class="text-end fw-bold text-dark">
+              NT$ {{ "{:,.0f}".format(item['price'] * item['quantity']) }}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot class="table-group-divider">
+          <tr>
+            <td colspan="5" class="text-end fw-semibold">總計件數：</td>
+            <td class="text-center fw-bold text-primary">{{ total_qty }} 件</td>
+            <td class="text-end">
+              <span class="small text-muted d-block">應付總額</span>
+              <strong class="fs-5 text-primary">NT$ {{ "{:,.0f}".format(total_amount) }}</strong>
+            </td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <!-- 簽收欄位 (專為出貨單與驗收簽名設計) -->
+    <div class="row g-4 pt-3 mt-4 border-top">
+      <div class="col-4">
+        <div class="small text-muted mb-4">倉庫經手人 / 檢貨人：</div>
+        <div class="border-bottom border-secondary-subtle pb-1 text-center text-muted" style="min-height: 28px;"></div>
+      </div>
+      <div class="col-4">
+        <div class="small text-muted mb-4">物流配送司機簽收：</div>
+        <div class="border-bottom border-secondary-subtle pb-1 text-center text-muted" style="min-height: 28px;"></div>
+      </div>
+      <div class="col-4">
+        <div class="small text-muted mb-4">客戶收貨驗收簽名：</div>
+        <div class="border-bottom border-secondary-subtle pb-1 text-center text-muted" style="min-height: 28px;"></div>
+      </div>
+    </div>
+
+    <div class="text-center text-muted small mt-4 pt-2">
+      ※ 本憑單隨貨同行，如有數量或規格不符，請於到貨 3 日內聯繫業務人員。
+    </div>
+
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  // 出貨單頁面快速更新狀態
+  const statusSelect = document.getElementById('detailStatusSelect');
+  if (statusSelect) {
+    statusSelect.addEventListener('change', async function() {
+      const newStatus = this.value;
+      try {
+        const response = await fetch("{{ url_for('update_order_status') }}", {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            order_id: "{{ order['order_id'] }}",
+            status: newStatus
+          })
+        });
+        const res = await response.json();
+        if (res.status === 'success') {
+          showToast(`出貨單狀態已更新為「${newStatus}」！`, 'success');
+          // 更新畫面 Badge
+          const badge = document.getElementById('detailStatusBadge');
+          if (badge) {
+            badge.className = 'badge-status';
+            if (newStatus === '處理中') {
+              badge.classList.add('badge-status-processing');
+              badge.textContent = '⏳ 處理中';
+            } else if (newStatus === '已出貨') {
+              badge.classList.add('badge-status-shipped');
+              badge.textContent = '🚚 已出貨';
+            } else if (newStatus === '已完成') {
+              badge.classList.add('badge-status-completed');
+              badge.textContent = '✅ 已完成';
+            } else {
+              badge.classList.add('badge-status-cancelled');
+              badge.textContent = '❌ 已取消';
+            }
+          }
+        } else {
+          showToast(res.message || '更新失敗', 'danger');
+        }
+      } catch (e) {
+        showToast('網路連線失敗', 'danger');
+      }
+    });
+  }
+</script>
+{% endblock %}

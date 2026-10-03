@@ -1,86 +1,83 @@
-# Flask Hello World 一頁式網站
+# OrderMaster Pro · 企業級訂單管理系統
 
 [![Flask CI/CD and Render Deploy](https://github.com/inuyasha129/0929-flask-project/actions/workflows/deploy.yml/badge.svg)](https://github.com/inuyasha129/0929-flask-project/actions/workflows/deploy.yml)
 
-這是一個基於 Python Flask 輕量級網頁框架所建立的現代化一頁式 (Single-Page) 網站示範專案，並整合 **GitHub Actions 自動化測試 (CI)** 與 **Render 雲端自動部署 (CD)**。
+基於 **Python Flask + SQLite + Bootstrap 5** 開發的現代化全功能訂單管理系統，具備權限驗證、商品保價機制、列表狀態即時更新與出貨單 QRCode 生成。
 
 ---
 
-## 專案目錄結構
+## 🔑 預設管理員帳密
 
-```text
-0929季老師/
-├── .github/workflows/
-│   └── deploy.yml        # GitHub Actions CI/CD 流程設定檔
-├── templates/
-│   └── index.html        # 前端一頁式網站模板 (Bootstrap 5 響應式排版)
-├── app.py                # Flask 主程式 (含首頁路由與問候 API)
-├── test_app.py           # 單元測試 (供 CI 自動檢驗)
-├── render.yaml           # Render 雲端服務配置檔 (Blueprint)
-├── requirements.txt      # 專案相依套件清單 (含 Flask, Gunicorn)
-├── run.bat               # Windows 本機一鍵啟動腳本
-├── push_to_github.bat    # Windows 一鍵推送 GitHub 腳本
-└── README.md             # 本說明文件
-```
+* **系統登入網址**：`http://127.0.0.1:5000/login`
+* **管理員帳號**：`admin`
+* **管理員密碼**：`admin123`
+*(登入頁提供「一鍵填入」便捷按鈕)*
 
 ---
 
-## 功能亮點
+## 🚀 系統啟動方式
 
-1. **Hello World 現代單頁設計**：採用 Bootstrap 5 響應式佈局，支援手機與電腦螢幕。
-2. **動態伺服器渲染**：透過 Flask Jinja2 模板動態渲染伺服器連線時間。
-3. **即時互動 API (`/api/greet`)**：前端藉由 Fetch API (AJAX) 向 Flask 後端送出使用者名稱，後端回傳專屬問候訊息並即時展示於畫面。
-4. **CI/CD 自動化流程**：
-   - 每次 Push / PR 自動執行 Python 語法檢驗與單元測試。
-   - 測試全數通過後，自動透過 Deploy Hook 部署至 Render 平台。
-
----
-
-## 本機啟動方式
-
-### 方法一：直接執行啟動腳本
-直接雙擊執行目錄中的 `run.bat`，或在終端機執行：
+### 方法一：Windows 一鍵執行腳本（最推薦）
+直接雙擊專案目錄下的 `run.bat`，或在 PowerShell 執行：
 ```powershell
 .\run.bat
 ```
 
-### 方法二：手動執行
-1. 啟動虛擬環境中的 Python 運行主程式：
+### 方法二：透過虛擬環境 Python 執行
 ```powershell
 .\.venv\Scripts\python.exe app.py
 ```
-2. 在瀏覽器打開以下網址：
-👉 **http://127.0.0.1:5000**
+啟動後於瀏覽器開啟：👉 **http://127.0.0.1:5000**
 
 ---
 
-## Render CI/CD 部署設定教學
+## 📋 測試資料說明 (已自動注入 5 筆繁體中文實體資料)
 
-### 步驟 1：在 Render 上建立 Web Service
-1. 註冊/登入 [Render](https://render.com/)。
-2. 點擊 **New +** 選擇 **Web Service**。
-3. 連結你的 GitHub 儲存庫：`inuyasha129/0929-flask-project`。
-4. 設定基本參數：
-   - **Name**: `0929-flask-project`
-   - **Region**: 建議選擇 `Singapore` 或鄰近區域
-   - **Branch**: `main`
-   - **Runtime**: `Python 3`
-   - **Build Command**: `pip install -r requirements.txt`
-   - **Start Command**: `gunicorn app:app`
-   - **Plan**: `Free`
-5. （建議）將 **Auto-Deploy** 設為 `No`，由 GitHub Actions 測試通過後再觸發部署。
+### 1. 客戶資料 (`customer`)
+| 客戶編號 | 公司/客戶名稱 | 聯絡電話 | 送貨地址 |
+| :--- | :--- | :--- | :--- |
+| `CUST-001` | 宏達數位科技有限公司 | 02-2345-6789 | 台北市信義區信義路五段7號85樓 |
+| `CUST-002` | 永慶精密機械股份有限公司 | 04-2258-9988 | 台中市西屯區台灣大道三段99號 |
+| `CUST-003` | 綠意生機連鎖事業部 | 07-555-1234 | 高雄市左營區博愛二路100號 |
+| `CUST-004` | 晨曦國際貿易行 | 03-333-8866 | 桃園市中壢區中正路200號 |
+| `CUST-005` | 睿智創新教育顧問社 | 06-200-5588 | 台南市東區大學路1號 |
 
-### 步驟 2：取得 Render Deploy Hook
-1. 在建立好的 Render Web Service 頁面中，點擊左側選單的 **Settings**。
-2. 往下滾動找到 **Deploy Hook** 區塊。
-3. 點擊 **Add Deploy Hook** 或複製現有的 URL（格式類似：`https://api.render.com/deploy/srv-xxxxxxx?key=yyyyyy`）。
+### 2. 商品資料 (`product`)
+| 商品編號 | 品名 | 現行單價 | 庫存 | 分類 |
+| :--- | :--- | :--- | :--- | :--- |
+| `PROD-001` | 旗艦級人體工學辦公椅 | NT$ 8,800 | 45 | 辦公家具 |
+| `PROD-002` | 4K UltraHD 智慧降噪視訊鏡頭 | NT$ 3,600 | 80 | 電腦周邊 |
+| `PROD-003` | 雙模無線機械式鍵盤 (青軸) | NT$ 2,450 | 120 | 電腦周邊 |
+| `PROD-004` | 專業抗藍光雙臂螢幕支架 | NT$ 1,890 | 65 | 辦公配件 |
+| `PROD-005` | 節能恆溫智能泡茶機 | NT$ 4,200 | 30 | 生活電器 |
 
-### 步驟 3：在 GitHub 設定 Secret
-1. 開啟 GitHub 倉庫：[inuyasha129/0929-flask-project](https://github.com/inuyasha129/0929-flask-project)
-2. 依序點擊：**Settings** -> **Secrets and variables** -> **Actions**。
-3. 點擊 **New repository secret**：
-   - **Name**: `RENDER_DEPLOY_HOOK_URL`
-   - **Secret**: 貼上剛才從 Render 複製的 Deploy Hook 完整網址。
-4. 點擊 **Add secret** 儲存。
+### 3. 訂單與訂單明細 (`orders` & `order_item`)
+涵蓋處理中、已出貨、已完成、已取消 4 種狀態：
+1. `ORD-20261001-001` (宏達數位) - 狀態：**已完成**，業務：陳家豪
+   * 辦公椅 × 2 (下單單價 $8,800) + 機械鍵盤 × 3 (下單單價 $2,450)
+2. `ORD-20261001-002` (永慶精密) - 狀態：**已出貨**，業務：林佩芬
+   * 4K鏡頭 × 5 (下單單價 $3,600) + 螢幕支架 × 4 (下單單價 $1,890)
+3. `ORD-20261002-001` (綠意生機) - 狀態：**處理中**，業務：王建銘
+   * 辦公椅 × 1 + 4K鏡頭 × 2 + 泡茶機 × 1
+4. `ORD-20261002-002` (晨曦國貿) - 狀態：**處理中**，業務：張雅婷
+   * 機械鍵盤 × 10
+5. `ORD-20261003-001` (睿智創新) - 狀態：**已取消**，業務：陳家豪
+   * 智能泡茶機 × 2
 
-完成後，未來每次推送至 `main` 分支，GitHub Actions 將會先執行自動測試，確認完全無誤後自動觸發 Render 部署上線！
+---
+
+## ✨ 核心設計與功能落實
+
+1. **資料表正規化與複合主鍵**：
+   * `order_item` 以 `(order_id, product_id)` 作為複合主鍵，防止重複項目並具備外鍵級聯防護。
+2. **下單當時單價快照機制 (價格鎖定)**：
+   * 下單時商品即時牌價被固化儲存至 `order_item.price`。即使日後在「商品維護」修改單價，**歷史訂單的總額與明細單價絕對不受影響**。
+3. **新增訂單便捷介面**：
+   * 客戶採用下拉選單快速挑選，自動帶出客戶地址與聯絡電話預覽。
+   * 商品清單支援多項商品一次勾選，自動解鎖數量欄位，並即時在頁面計算小計與整張訂單金額。
+4. **訂單狀態列表即時切換**：
+   * 支援 4 種狀態：`處理中` / `已出貨` / `已完成` / `已取消`。
+   * 可直接於訂單列表下拉選單切換，透過非同步 (AJAX) 即時儲存至資料庫並顯示動態提示。
+5. **專屬出貨單與 QRCode 產生 (`/order/<訂單編號>`)**：
+   * 每張訂單具備獨立網址，自動生成高解析度出貨單 QRCode。
+   * 掃碼可直接連入該出貨單驗收。支援「一鍵列印」，內建專用 `@media print` 樣式自動隱藏導覽列與按鈕，產出標準 A4 出貨憑證。

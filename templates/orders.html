@@ -1,0 +1,166 @@
+{% extends 'base.html' %}
+
+{% block title %}訂單管理與狀態更新{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-lg-4">
+
+  <!-- Header -->
+  <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+    <div>
+      <h2 class="fw-bold mb-1 text-dark">訂單管理中心</h2>
+      <p class="text-muted small mb-0">即時監控所有訂單進度，並可直接於列表中更新訂單狀態</p>
+    </div>
+    <div class="d-flex gap-2">
+      <a href="{{ url_for('order_create') }}" class="btn btn-primary shadow-sm rounded-pill px-3">
+        <i class="bi bi-cart-plus-fill me-1"></i> 建立新訂單
+      </a>
+    </div>
+  </div>
+
+  <!-- 狀態篩選頁籤 (Requirement 8) -->
+  <div class="d-flex flex-wrap gap-2 mb-3">
+    <a href="{{ url_for('orders_list') }}" class="btn btn-sm {% if not current_status %}btn-dark{% else %}btn-outline-secondary{% endif %} rounded-pill px-3">
+      全部訂單 ({{ counts['全部'] }})
+    </a>
+    <a href="{{ url_for('orders_list', status='處理中') }}" class="btn btn-sm {% if current_status == '處理中' %}btn-warning text-dark{% else %}btn-outline-warning text-dark{% endif %} rounded-pill px-3">
+      <i class="bi bi-hourglass-split me-1"></i> 處理中 ({{ counts['處理中'] }})
+    </a>
+    <a href="{{ url_for('orders_list', status='已出貨') }}" class="btn btn-sm {% if current_status == '已出貨' %}btn-info text-white{% else %}btn-outline-info text-dark{% endif %} rounded-pill px-3">
+      <i class="bi bi-truck me-1"></i> 已出貨 ({{ counts['已出貨'] }})
+    </a>
+    <a href="{{ url_for('orders_list', status='已完成') }}" class="btn btn-sm {% if current_status == '已完成' %}btn-success{% else %}btn-outline-success{% endif %} rounded-pill px-3">
+      <i class="bi bi-check-circle me-1"></i> 已完成 ({{ counts['已完成'] }})
+    </a>
+    <a href="{{ url_for('orders_list', status='已取消') }}" class="btn btn-sm {% if current_status == '已取消' %}btn-secondary{% else %}btn-outline-secondary{% endif %} rounded-pill px-3">
+      <i class="bi bi-x-circle me-1"></i> 已取消 ({{ counts['已取消'] }})
+    </a>
+  </div>
+
+  <!-- Orders Table Card -->
+  <div class="card border-0 shadow-sm overflow-hidden mb-4">
+    <div class="table-responsive">
+      <table class="table table-custom align-middle">
+        <thead>
+          <tr>
+            <th>訂單編號 (PK)</th>
+            <th>訂購客戶</th>
+            <th>訂單日期</th>
+            <th>業務人員</th>
+            <th>品項明細</th>
+            <th>訂單總額</th>
+            <th style="min-width: 150px;">訂單狀態 (可列表即時更新)</th>
+            <th class="text-end">操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for o in orders %}
+          <tr id="row-{{ o['order_id'] }}">
+            <td>
+              <a href="{{ url_for('order_detail', order_id=o['order_id']) }}" class="fw-bold text-primary text-decoration-none">
+                <code>{{ o['order_id'] }}</code>
+              </a>
+            </td>
+            <td>
+              <div class="fw-semibold text-dark">{{ o['customer_name'] }}</div>
+              <small class="text-muted"><i class="bi bi-telephone me-1"></i>{{ o['customer_phone'] }}</small>
+            </td>
+            <td>{{ o['order_date'] }}</td>
+            <td>
+              <span class="badge bg-light text-secondary border">{{ o['salesperson'] }}</span>
+            </td>
+            <td>
+              <span class="badge bg-light text-dark border">
+                {{ o['item_count'] }} 項商品 (共 {{ o['total_quantity'] }} 件)
+              </span>
+            </td>
+            <td class="fw-bold text-dark fs-6">
+              NT$ {{ "{:,.0f}".format(o['total_amount'] or 0) }}
+            </td>
+            <td>
+              <!-- Requirement 8: 可在列表直接更新狀態 -->
+              <div class="d-flex align-items-center gap-1">
+                <select class="form-select form-select-sm status-selector status-select-{{ o['order_id'] }}"
+                  data-order-id="{{ o['order_id'] }}"
+                  data-current="{{ o['status'] }}">
+                  <option value="處理中" {% if o['status'] == '處理中' %}selected{% endif %}>⏳ 處理中</option>
+                  <option value="已出貨" {% if o['status'] == '已出貨' %}selected{% endif %}>🚚 已出貨</option>
+                  <option value="已完成" {% if o['status'] == '已完成' %}selected{% endif %}>✅ 已完成</option>
+                  <option value="已取消" {% if o['status'] == '已取消' %}selected{% endif %}>❌ 已取消</option>
+                </select>
+                <span class="spinner-border spinner-border-sm text-primary d-none" id="spinner-{{ o['order_id'] }}" role="status"></span>
+              </div>
+            </td>
+            <td class="text-end">
+              <a href="{{ url_for('order_detail', order_id=o['order_id']) }}" class="btn btn-sm btn-outline-primary rounded-pill me-1" title="查看專屬頁面與出貨單 QRCode">
+                <i class="bi bi-qr-code me-1"></i> 出貨單
+              </a>
+              <form method="POST" action="{{ url_for('order_delete', order_id=o['order_id']) }}" class="d-inline" onsubmit="return confirm('確定要刪除訂單【{{ o['order_id'] }}】嗎？相關訂單明細亦將一併移除。');">
+                <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill" title="刪除訂單">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </form>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="8" class="text-center py-5 text-muted">
+              <i class="bi bi-inbox fs-2 d-block mb-2 text-secondary"></i>
+              目前此分類下沒有訂單資料
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  // 列表直接即時更新狀態 (Requirement 8)
+  document.querySelectorAll('.status-selector').forEach(select => {
+    select.addEventListener('change', async function() {
+      const orderId = this.getAttribute('data-order-id');
+      const newStatus = this.value;
+      const prevStatus = this.getAttribute('data-current');
+      const spinner = document.getElementById(`spinner-${orderId}`);
+
+      if (spinner) spinner.classList.remove('d-none');
+      this.disabled = true;
+
+      try {
+        const response = await fetch("{{ url_for('update_order_status') }}", {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify({
+            order_id: orderId,
+            status: newStatus
+          })
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.status === 'success') {
+          this.setAttribute('data-current', newStatus);
+          showToast(`訂單【${orderId}】狀態已成功更新為：${newStatus}`, 'success');
+        } else {
+          showToast(data.message || '更新失敗，已還原原狀態', 'danger');
+          this.value = prevStatus;
+        }
+      } catch (err) {
+        showToast('連線異常，更新失敗', 'danger');
+        this.value = prevStatus;
+      } finally {
+        if (spinner) spinner.classList.add('d-none');
+        this.disabled = false;
+      }
+    });
+  });
+</script>
+{% endblock %}

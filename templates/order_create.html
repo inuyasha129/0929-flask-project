@@ -1,0 +1,294 @@
+{% extends 'base.html' %}
+
+{% block title %}建立新訂單{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-lg-4">
+
+  <!-- Header -->
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h2 class="fw-bold mb-1 text-dark">建立新銷售訂單</h2>
+      <p class="text-muted small mb-0">請選擇訂購客戶並於下方清單勾選多項商品與填寫購買數量</p>
+    </div>
+    <a href="{{ url_for('orders_list') }}" class="btn btn-outline-secondary rounded-pill px-3">
+      <i class="bi bi-arrow-left me-1"></i> 返回訂單列表
+    </a>
+  </div>
+
+  <form method="POST" action="{{ url_for('order_create') }}" id="orderForm">
+
+    <!-- 區塊一：訂單基本資訊與客戶下拉選單 -->
+    <div class="row g-3 mb-4">
+      <div class="col-lg-6">
+        <div class="card border-0 shadow-sm p-4 h-100">
+          <h5 class="fw-bold text-dark mb-3"><i class="bi bi-file-earmark-text text-primary me-2"></i>訂單基本資料</h5>
+          <div class="row g-3">
+            <div class="col-sm-6">
+              <label class="form-label small fw-semibold text-secondary">訂單編號 (PK) <span class="text-danger">*</span></label>
+              <input type="text" name="order_id" class="form-control" value="{{ new_order_id }}" required>
+              <div class="form-text small text-muted">系統已依當日自動編碼，亦可手動微調</div>
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label small fw-semibold text-secondary">訂單日期 <span class="text-danger">*</span></label>
+              <input type="date" name="order_date" class="form-control" value="{{ today_str }}" required>
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label small fw-semibold text-secondary">負責業務人員 <span class="text-danger">*</span></label>
+              <input type="text" name="salesperson" class="form-control" value="{{ session.get('user_name', '陳家豪') }}" required>
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label small fw-semibold text-secondary">初始訂單狀態 <span class="text-danger">*</span></label>
+              <select name="status" class="form-select" required>
+                <option value="處理中" selected>⏳ 處理中 (預設)</option>
+                <option value="已出貨">🚚 已出貨</option>
+                <option value="已完成">✅ 已完成</option>
+                <option value="已取消">❌ 已取消</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 客戶下拉選單 (Requirement 6) -->
+      <div class="col-lg-6">
+        <div class="card border-0 shadow-sm p-4 h-100">
+          <h5 class="fw-bold text-dark mb-3"><i class="bi bi-person-check text-primary me-2"></i>訂購客戶選擇 (下拉選單)</h5>
+          
+          <div class="mb-3">
+            <label class="form-label small fw-semibold text-secondary">選擇客戶 <span class="text-danger">*</span></label>
+            <select name="customer_id" id="customerSelect" class="form-select" required>
+              <option value="">-- 請由下拉選單選取客戶 --</option>
+              {% for c in customers %}
+                <option value="{{ c['customer_id'] }}"
+                  data-name="{{ c['name'] }}"
+                  data-phone="{{ c['phone'] }}"
+                  data-address="{{ c['address'] }}">
+                  [{{ c['customer_id'] }}] {{ c['name'] }} ({{ c['phone'] }})
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <!-- 客戶詳細資料即時預覽卡 -->
+          <div id="customerInfoCard" class="p-3 bg-light rounded-3 border d-none">
+            <div class="d-flex align-items-center mb-1">
+              <span class="badge bg-primary me-2" id="custBadge"></span>
+              <strong id="custName" class="text-dark"></strong>
+            </div>
+            <div class="small text-muted mb-1"><i class="bi bi-telephone me-1"></i>聯絡電話：<span id="custPhone" class="text-dark"></span></div>
+            <div class="small text-muted"><i class="bi bi-geo-alt me-1"></i>送貨地址：<span id="custAddress" class="text-dark"></span></div>
+          </div>
+
+          <div id="noCustomerHint" class="p-3 text-center text-muted small border border-dashed rounded-3">
+            <i class="bi bi-info-circle me-1"></i> 請於上方下拉選單指定下單客戶，以載入送貨資訊
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 區塊二：商品多選與填寫數量 (Requirement 6 & 7) -->
+    <div class="card border-0 shadow-sm overflow-hidden mb-4">
+      <div class="card-header bg-white py-3 px-4 d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-2">
+        <div>
+          <h5 class="fw-bold mb-0 text-dark"><i class="bi bi-cart-check text-primary me-2"></i>挑選商品項目 (可多選並填寫數量)</h5>
+          <span class="text-muted small">勾選商品項目後將自動啟用數量填寫欄位，下單時自動固化當下商品牌價</span>
+        </div>
+        <div class="badge bg-info-subtle text-info border border-info-subtle px-3 py-2 rounded-pill">
+          <i class="bi bi-shield-check me-1"></i> 當時單價自動快照記錄
+        </div>
+      </div>
+
+      <div class="table-responsive">
+        <table class="table table-custom align-middle">
+          <thead>
+            <tr>
+              <th style="width: 50px;" class="text-center">選取</th>
+              <th>商品編號</th>
+              <th>商品品名</th>
+              <th>分類</th>
+              <th>現行單價 (NT$)</th>
+              <th>庫存數量</th>
+              <th style="width: 140px;">購買數量</th>
+              <th class="text-end" style="width: 150px;">項目小計</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for p in products %}
+            <tr id="prod-row-{{ p['product_id'] }}" class="product-row">
+              <td class="text-center">
+                <input type="checkbox" name="selected_products" value="{{ p['product_id'] }}"
+                  class="form-check-input prod-checkbox fs-5"
+                  id="chk-{{ p['product_id'] }}"
+                  data-id="{{ p['product_id'] }}"
+                  data-price="{{ p['price'] }}"
+                  data-stock="{{ p['stock'] }}"
+                  {% if p['stock'] <= 0 %}disabled{% endif %}>
+              </td>
+              <td>
+                <label for="chk-{{ p['product_id'] }}" class="cursor-pointer mb-0">
+                  <code>{{ p['product_id'] }}</code>
+                </label>
+              </td>
+              <td>
+                <label for="chk-{{ p['product_id'] }}" class="cursor-pointer mb-0 fw-semibold text-dark">
+                  {{ p['name'] }}
+                </label>
+              </td>
+              <td><span class="badge bg-light text-secondary border">{{ p['category'] }}</span></td>
+              <td class="fw-bold text-success fs-6">
+                NT$ {{ "{:,.0f}".format(p['price']) }}
+              </td>
+              <td>
+                {% if p['stock'] > 0 %}
+                  <span class="badge bg-light text-dark border">{{ p['stock'] }} 件</span>
+                {% else %}
+                  <span class="badge bg-danger-subtle text-danger border border-danger-subtle">已售罄</span>
+                {% endif %}
+              </td>
+              <td>
+                <input type="number" name="quantity_{{ p['product_id'] }}"
+                  id="qty-{{ p['product_id'] }}"
+                  class="form-control form-control-sm prod-qty text-center fw-bold"
+                  value="1" min="1" max="{{ p['stock'] }}"
+                  data-id="{{ p['product_id'] }}"
+                  disabled>
+              </td>
+              <td class="text-end fw-bold text-dark fs-6">
+                <span id="subtotal-{{ p['product_id'] }}">NT$ 0</span>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- 訂單金額即時總結列 -->
+      <div class="card-footer bg-light p-3 p-sm-4 d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-3">
+        <div class="d-flex align-items-center gap-3">
+          <div class="text-secondary small">
+            已勾選品項：<strong id="selectedCount" class="text-primary fs-6">0</strong> 項
+          </div>
+          <div class="text-secondary small">
+            總商品件數：<strong id="totalQty" class="text-primary fs-6">0</strong> 件
+          </div>
+        </div>
+        <div class="d-flex align-items-center gap-3">
+          <div class="text-end">
+            <div class="text-muted small">訂單應付總計</div>
+            <div class="fs-4 fw-bold text-primary" id="totalAmount">NT$ 0</div>
+          </div>
+          <button type="submit" class="btn btn-primary btn-lg rounded-pill px-4 shadow-sm" id="btnSubmitOrder">
+            <i class="bi bi-check-circle-fill me-1"></i> 確認成立訂單
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </form>
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  // 客戶下拉選單即時連動預覽
+  const customerSelect = document.getElementById('customerSelect');
+  const customerInfoCard = document.getElementById('customerInfoCard');
+  const noCustomerHint = document.getElementById('noCustomerHint');
+  const custBadge = document.getElementById('custBadge');
+  const custName = document.getElementById('custName');
+  const custPhone = document.getElementById('custPhone');
+  const custAddress = document.getElementById('custAddress');
+
+  customerSelect.addEventListener('change', function() {
+    const selectedOption = this.options[this.selectedIndex];
+    if (this.value) {
+      custBadge.textContent = this.value;
+      custName.textContent = selectedOption.getAttribute('data-name');
+      custPhone.textContent = selectedOption.getAttribute('data-phone');
+      custAddress.textContent = selectedOption.getAttribute('data-address');
+      customerInfoCard.classList.remove('d-none');
+      noCustomerHint.classList.add('d-none');
+    } else {
+      customerInfoCard.classList.add('d-none');
+      noCustomerHint.classList.remove('d-none');
+    }
+  });
+
+  // 商品多選與數量即時計算小計與總額 (Requirement 6 & 7)
+  const checkboxes = document.querySelectorAll('.prod-checkbox');
+  const qtyInputs = document.querySelectorAll('.prod-qty');
+  const selectedCountEl = document.getElementById('selectedCount');
+  const totalQtyEl = document.getElementById('totalQty');
+  const totalAmountEl = document.getElementById('totalAmount');
+
+  function calculateTotals() {
+    let selectedCount = 0;
+    let totalQty = 0;
+    let grandTotal = 0;
+
+    checkboxes.forEach(chk => {
+      const pid = chk.getAttribute('data-id');
+      const price = parseFloat(chk.getAttribute('data-price')) || 0;
+      const qtyInput = document.getElementById(`qty-${pid}`);
+      const subtotalEl = document.getElementById(`subtotal-${pid}`);
+      const row = document.getElementById(`prod-row-${pid}`);
+
+      if (chk.checked) {
+        qtyInput.disabled = false;
+        let qty = parseInt(qtyInput.value) || 1;
+        const maxStock = parseInt(chk.getAttribute('data-stock')) || 1;
+        if (qty < 1) qty = 1;
+        if (qty > maxStock) qty = maxStock;
+        qtyInput.value = qty;
+
+        const subtotal = price * qty;
+        subtotalEl.textContent = 'NT$ ' + subtotal.toLocaleString('zh-TW');
+        row.classList.add('table-primary');
+
+        selectedCount += 1;
+        totalQty += qty;
+        grandTotal += subtotal;
+      } else {
+        qtyInput.disabled = true;
+        subtotalEl.textContent = 'NT$ 0';
+        row.classList.remove('table-primary');
+      }
+    });
+
+    selectedCountEl.textContent = selectedCount;
+    totalQtyEl.textContent = totalQty;
+    totalAmountEl.textContent = 'NT$ ' + grandTotal.toLocaleString('zh-TW');
+  }
+
+  checkboxes.forEach(chk => {
+    chk.addEventListener('change', calculateTotals);
+  });
+
+  qtyInputs.forEach(input => {
+    input.addEventListener('input', calculateTotals);
+    input.addEventListener('change', calculateTotals);
+  });
+
+  // 提交驗證防呆
+  document.getElementById('orderForm').addEventListener('submit', function(e) {
+    if (!customerSelect.value) {
+      e.preventDefault();
+      showToast('請務必從下拉選單選擇一位下單客戶！', 'danger');
+      customerSelect.focus();
+      return;
+    }
+
+    const anyChecked = Array.from(checkboxes).some(c => c.checked);
+    if (!anyChecked) {
+      e.preventDefault();
+      showToast('請至少勾選一項要購買的商品！', 'danger');
+      return;
+    }
+  });
+
+  // 頁面初次載入執行一次計算
+  calculateTotals();
+</script>
+{% endblock %}

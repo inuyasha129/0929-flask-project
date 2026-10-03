@@ -1,0 +1,69 @@
+{% extends 'base.html' %}
+
+{% block title %}管理員登入{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+  <div class="row justify-content-center">
+    <div class="col-12 col-sm-10 col-md-8 col-lg-5">
+      <div class="card shadow-lg border-0 rounded-4 overflow-hidden">
+        <div class="p-4 p-sm-5 bg-white">
+          <div class="text-center mb-4">
+            <div class="bg-primary-subtle text-primary rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 64px; height: 64px;">
+              <i class="bi bi-shield-lock-fill fs-2"></i>
+            </div>
+            <h3 class="fw-bold text-dark">管理員登入</h3>
+            <p class="text-muted small">請輸入後台管理憑證以存取訂單系統</p>
+          </div>
+
+          <!-- 登入表單 -->
+          <form method="POST" action="{{ url_for('login') }}">
+            <div class="mb-3">
+              <label for="username" class="form-label fw-semibold text-secondary small">管理員帳號</label>
+              <div class="input-group">
+                <span class="input-group-text bg-light border-end-0 text-muted"><i class="bi bi-person"></i></span>
+                <input type="text" class="form-control border-start-0" id="username" name="username" placeholder="請輸入帳號" required autofocus value="admin">
+              </div>
+            </div>
+
+            <div class="mb-4">
+              <label for="password" class="form-label fw-semibold text-secondary small">登入密碼</label>
+              <div class="input-group">
+                <span class="input-group-text bg-light border-end-0 text-muted"><i class="bi bi-key"></i></span>
+                <input type="password" class="form-control border-start-0" id="password" name="password" placeholder="請輸入密碼" required value="admin123">
+              </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100 py-2 fs-6 fw-semibold shadow-sm rounded-3">
+              <i class="bi bi-box-arrow-in-right me-1"></i> 立即登入
+            </button>
+          </form>
+
+          <!-- 測試帳號提示區塊 -->
+          <div class="mt-4 p-3 bg-light rounded-3 border">
+            <div class="d-flex align-items-center justify-content-between mb-1">
+              <span class="small fw-semibold text-dark"><i class="bi bi-info-circle me-1 text-primary"></i> 預設管理員帳密</span>
+              <button type="button" class="btn btn-sm btn-link text-decoration-none p-0" id="btnFillDemo">一鍵填入</button>
+            </div>
+            <div class="small text-muted">
+              <div>帳號：<code>admin</code></div>
+              <div>密碼：<code>admin123</code></div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  document.getElementById('btnFillDemo')?.addEventListener('click', function() {
+    document.getElementById('username').value = 'admin';
+    document.getElementById('password').value = 'admin123';
+    showToast('已為您填入預設管理員帳號與密碼！', 'info');
+  });
+</script>
+{% endblock %}
