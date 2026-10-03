@@ -1,5 +1,7 @@
 # Flask Hello World 一頁式網站
 
+[![Flask CI/CD and Render Deploy](https://github.com/inuyasha129/0929-flask-project/actions/workflows/deploy.yml/badge.svg)](https://github.com/inuyasha129/0929-flask-project/actions/workflows/deploy.yml)
+
 這是一個基於 Python Flask 輕量級網頁框架所建立的現代化一頁式 (Single-Page) 網站示範專案，並整合 **GitHub Actions 自動化測試 (CI)** 與 **Render 雲端自動部署 (CD)**。
 
 ---
