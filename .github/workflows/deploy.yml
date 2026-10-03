@@ -1,0 +1,74 @@
+name: Flask CI/CD and Render Deploy
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  # ======================================================
+  # 1. CI 階段：執行自動化測試與代碼檢驗
+  # ======================================================
+  ci-tests:
+    name: Run Tests & Code Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 檢出專案代碼 (Checkout)
+        uses: actions/checkout@v4
+
+      - name: 設定 Python 環境 (Python 3.11)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 安裝專案依賴套件
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 檢查 Python 語法結構 (Syntax Compile)
+        run: |
+          python -m py_compile app.py test_app.py
+
+      - name: 執行單元測試 (Unit Tests)
+        run: |
+          python -m unittest test_app.py
+
+  # ======================================================
+  # 2. CD 階段：CI 通過後觸發 Render 部署
+  # ======================================================
+  cd-deploy:
+    name: Deploy to Render
+    needs: ci-tests
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 呼叫 Render Deploy Hook 觸發線上部署
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$RENDER_DEPLOY_HOOK_URL" ]; then
+            echo "❌ 尚未在 GitHub Repository Secrets 中設定 RENDER_DEPLOY_HOOK_URL！"
+            echo "👉 請至 GitHub 儲存庫的 Settings -> Secrets and variables -> Actions"
+            echo "👉 新增 Secret 名稱：RENDER_DEPLOY_HOOK_URL，內容貼上 Render 的 Deploy Hook 網址。"
+            exit 1
+          fi
+
+          echo "🚀 正在觸發 Render 部署服務..."
+          HTTP_STATUS=$(curl -s -o response.txt -w "%{http_code}" -X POST "$RENDER_DEPLOY_HOOK_URL")
+
+          echo "伺服器回應代碼: $HTTP_STATUS"
+          cat response.txt
+          echo ""
+
+          if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 300 ]; then
+            echo "✅ 成功觸發 Render 部署流程！"
+          else
+            echo "❌ 觸發部署失敗，請確認 Deploy Hook 網址是否正確。"
+            exit 1
+          fi
