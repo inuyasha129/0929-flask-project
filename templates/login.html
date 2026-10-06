@@ -30,7 +30,7 @@
               <label for="password" class="form-label fw-semibold text-secondary small">登入密碼</label>
               <div class="input-group">
                 <span class="input-group-text bg-light border-end-0 text-muted"><i class="bi bi-key"></i></span>
-                <input type="password" class="form-control border-start-0" id="password" name="password" placeholder="請輸入密碼" required value="admin123">
+                <input type="password" class="form-control border-start-0" id="password" name="password" placeholder="請輸入密碼" required autocomplete="current-password">
               </div>
             </div>
 
@@ -39,15 +39,16 @@
             </button>
           </form>
 
-          <!-- 測試帳號提示區塊 -->
+          <!-- 系統安全憑證說明區塊 (程式與畫面均無明碼密碼) -->
           <div class="mt-4 p-3 bg-light rounded-3 border">
-            <div class="d-flex align-items-center justify-content-between mb-1">
-              <span class="small fw-semibold text-dark"><i class="bi bi-info-circle me-1 text-primary"></i> 預設管理員帳密</span>
-              <button type="button" class="btn btn-sm btn-link text-decoration-none p-0" id="btnFillDemo">一鍵填入</button>
+            <div class="d-flex align-items-center mb-1">
+              <span class="small fw-semibold text-dark"><i class="bi bi-shield-check me-1 text-primary"></i> 系統安全憑證</span>
             </div>
             <div class="small text-muted">
-              <div>帳號：<code>admin</code></div>
-              <div>密碼：<code>admin123</code></div>
+              <div>管理員預設帳號：<code>admin</code></div>
+              <div class="text-secondary small mt-1">
+                <i class="bi bi-lock-fill me-1"></i> 密碼採 Werkzeug 安全雜湊保護，程式碼與前端畫面皆無明碼。
+              </div>
             </div>
           </div>
 
@@ -56,14 +57,4 @@
     </div>
   </div>
 </div>
-{% endblock %}
-
-{% block extra_scripts %}
-<script>
-  document.getElementById('btnFillDemo')?.addEventListener('click', function() {
-    document.getElementById('username').value = 'admin';
-    document.getElementById('password').value = 'admin123';
-    showToast('已為您填入預設管理員帳號與密碼！', 'info');
-  });
-</script>
 {% endblock %}

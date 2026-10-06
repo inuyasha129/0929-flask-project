@@ -1,6 +1,7 @@
 import os
 import io
 import base64
+import re
 from datetime import datetime
 from functools import wraps
 
@@ -24,14 +25,18 @@ with app.app_context():
     init_db()
 
 # ==========================================
-# 權限驗證裝飾器 (Login Required)
+# 權限驗證裝飾器 (Login Required & Admin Role)
 # ==========================================
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
+        # 需求 2: 後台所有頁面需登入 (session) 且角色為管理員才能進入
         if not session.get('user_id'):
-            flash('請先登入管理員帳號以使用系統功能', 'warning')
+            flash('請先登入管理員帳號以使用後台功能', 'warning')
             return redirect(url_for('login', next=request.url))
+        if session.get('role') != 'admin':
+            flash('權限不足！只有管理員角色才能進入後台系統。', 'danger')
+            return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated_function
 
@@ -49,14 +54,16 @@ def login():
         admin = conn.execute("SELECT * FROM admin WHERE username = ?", (username,)).fetchone()
         conn.close()
 
+        # 需求 1: 使用 werkzeug 雜湊比對密碼，不出現明碼
         if admin and check_password_hash(admin['password_hash'], password):
             session['user_id'] = admin['username']
             session['user_name'] = admin['name']
+            session['role'] = admin['role'] if 'role' in admin.keys() else 'admin'
             flash(f"歡迎回來，{admin['name']}！登入成功。", 'success')
             next_url = request.args.get('next')
-            return redirect(next_url or url_for('dashboard'))
+            return redirect(next_url or url_for('admin_dashboard'))
         else:
-            flash("帳號或密碼輸入錯誤，請重新確認！(預設 admin / admin123)", "danger")
+            flash("帳號或密碼輸入錯誤，請重新確認！", "danger")
 
     return render_template('login.html')
 
@@ -91,8 +98,8 @@ def dashboard():
         SELECT COALESCE(SUM(oi.quantity * oi.price), 0) as total_rev
         FROM order_item oi
         JOIN orders o ON oi.order_id = o.order_id
-        WHERE o.status != '已取消'
-    """).fetchone()
+        WHERE o.status != ?
+    """, ('已取消',)).fetchone()
     total_revenue = total_rev_row['total_rev'] if total_rev_row else 0.0
 
     # 5. 各狀態訂單計數
@@ -125,6 +132,120 @@ def dashboard():
         total_revenue=total_revenue,
         status_counts=status_counts,
         recent_orders=recent_orders
+    )
+
+# ==========================================
+# 營運分析儀表板 (/admin)
+# ==========================================
+@app.route('/admin')
+@login_required
+def admin_dashboard():
+    """
+    營運分析儀表板 (/admin):
+    1. 上方四張 KPI 卡：累計營收、有效訂單數、平均客單價、客戶數（狀態為已取消之訂單不列入計算）
+    2. 每月營收趨勢：Chart.js 折線圖
+    3. 訂單狀態分布：Chart.js 環圈圖
+    4. 熱銷商品 Top 5：商品名稱、售出數量、營收
+    5. 客戶消費排行 Top 5：客戶名稱、訂單數、消費金額
+    """
+    conn = get_db_connection()
+
+    # 1. 四大 KPI 指標（狀態為「已取消」之訂單不列入計算）
+    rev_row = conn.execute("""
+        SELECT COALESCE(SUM(oi.quantity * oi.price), 0) AS total_rev
+        FROM order_item oi
+        JOIN orders o ON oi.order_id = o.order_id
+        WHERE o.status != ?
+    """, ('已取消',)).fetchone()
+    total_revenue = rev_row['total_rev'] if rev_row else 0.0
+
+    valid_orders_cnt = conn.execute(
+        "SELECT COUNT(*) FROM orders WHERE status != ?",
+        ('已取消',)
+    ).fetchone()[0]
+
+    avg_order_value = (total_revenue / valid_orders_cnt) if valid_orders_cnt > 0 else 0.0
+
+    active_customers_cnt = conn.execute(
+        "SELECT COUNT(DISTINCT customer_id) FROM orders WHERE status != ?",
+        ('已取消',)
+    ).fetchone()[0]
+    total_customers_cnt = conn.execute("SELECT COUNT(*) FROM customer").fetchone()[0]
+
+    # 2. 每月營收趨勢 (排除已取消)
+    monthly_rows = conn.execute("""
+        SELECT substr(o.order_date, 1, 7) AS month,
+               COALESCE(SUM(oi.quantity * oi.price), 0) AS revenue,
+               COUNT(DISTINCT o.order_id) AS order_cnt
+        FROM orders o
+        JOIN order_item oi ON o.order_id = oi.order_id
+        WHERE o.status != ?
+        GROUP BY month
+        ORDER BY month ASC
+    """, ('已取消',)).fetchall()
+
+    monthly_labels = [r['month'] for r in monthly_rows]
+    monthly_revenues = [round(r['revenue'], 2) for r in monthly_rows]
+    monthly_order_counts = [r['order_cnt'] for r in monthly_rows]
+
+    # 3. 訂單狀態分布 (環圈圖)
+    status_rows = conn.execute("""
+        SELECT status, COUNT(*) AS count
+        FROM orders
+        GROUP BY status
+    """).fetchall()
+
+    status_dict = {'處理中': 0, '已出貨': 0, '已完成': 0, '已取消': 0}
+    for r in status_rows:
+        status_dict[r['status']] = r['count']
+
+    status_labels = ['處理中', '已出貨', '已完成', '已取消']
+    status_counts = [status_dict[s] for s in status_labels]
+
+    # 4. 熱銷商品 Top 5 (排除已取消)
+    top_products = conn.execute("""
+        SELECT p.product_id, p.name AS product_name, p.category,
+               COALESCE(SUM(oi.quantity), 0) AS total_sold,
+               COALESCE(SUM(oi.quantity * oi.price), 0) AS total_revenue
+        FROM order_item oi
+        JOIN orders o ON oi.order_id = o.order_id
+        JOIN product p ON oi.product_id = p.product_id
+        WHERE o.status != ?
+        GROUP BY p.product_id, p.name, p.category
+        ORDER BY total_sold DESC, total_revenue DESC
+        LIMIT 5
+    """, ('已取消',)).fetchall()
+
+    # 5. 客戶消費排行 Top 5 (排除已取消)
+    top_customers = conn.execute("""
+        SELECT c.customer_id, c.name AS customer_name, c.phone,
+               COUNT(DISTINCT o.order_id) AS order_count,
+               COALESCE(SUM(oi.quantity * oi.price), 0) AS total_spent
+        FROM customer c
+        JOIN orders o ON c.customer_id = o.customer_id
+        JOIN order_item oi ON o.order_id = oi.order_id
+        WHERE o.status != ?
+        GROUP BY c.customer_id, c.name, c.phone
+        ORDER BY total_spent DESC, order_count DESC
+        LIMIT 5
+    """, ('已取消',)).fetchall()
+
+    conn.close()
+
+    return render_template(
+        'admin_dashboard.html',
+        total_revenue=total_revenue,
+        valid_orders_cnt=valid_orders_cnt,
+        avg_order_value=avg_order_value,
+        active_customers_cnt=active_customers_cnt,
+        total_customers_cnt=total_customers_cnt,
+        monthly_labels=monthly_labels,
+        monthly_revenues=monthly_revenues,
+        monthly_order_counts=monthly_order_counts,
+        status_labels=status_labels,
+        status_counts=status_counts,
+        top_products=top_products,
+        top_customers=top_customers
     )
 
 # ==========================================
@@ -429,9 +550,10 @@ def orders_list():
 @login_required
 def order_create():
     """
-    建立新訂單 (需求 6 & 需求 7):
-    - 客戶用下拉選單
-    - 商品可一次勾選多項並填數量
+    建立新訂單 (需求 4 & 5):
+    - 客戶與商品皆為下拉選單
+    - 訂單編號加上 SO+數字 格式驗證
+    - 數量必須是正整數 (後端驗證與 DB CHECK 約束)
     - order_item 存下單當時的單價
     """
     conn = get_db_connection()
@@ -443,51 +565,82 @@ def order_create():
         status = request.form.get('status', '處理中').strip()
         salesperson = request.form.get('salesperson', '').strip()
 
-        # 勾選的多項商品
-        selected_products = request.form.getlist('selected_products')
-
+        # 1. 客戶必選驗證
         if not customer_id:
             flash("請由下拉選單選取訂購客戶！", "danger")
             conn.close()
             return redirect(url_for('order_create'))
 
-        if not selected_products:
-            flash("請至少勾選一項要購買的商品！", "danger")
+        # 2. 訂單編號驗證 (需求 4: 必須為 SO + 數字)
+        if not order_id:
+            today_code = datetime.now().strftime("%Y%m%d")
+            today_str = datetime.now().strftime("%Y-%m-%d")
+            count_today = conn.execute("SELECT COUNT(*) FROM orders WHERE order_date = ?", (today_str,)).fetchone()[0] + 1
+            order_id = f"SO{today_code}{count_today:03d}"
+
+        if not re.match(r'^SO\d+$', order_id):
+            flash("訂單編號格式不符！必須以 'SO' 開頭且後方全為數字（例如：SO20261006001）。", "danger")
             conn.close()
             return redirect(url_for('order_create'))
 
-        if not order_id:
-            today_prefix = datetime.now().strftime("%Y%m%d")
-            order_id = f"ORD-{today_prefix}-{datetime.now().strftime('%H%M%S')}"
+        # 3. 收集商品與數量 (支援商品下拉選單與多項選取)
+        items_to_process = []
+        product_ids = request.form.getlist('product_id')
+        quantities = request.form.getlist('quantity')
+
+        if product_ids:
+            for idx, pid in enumerate(product_ids):
+                pid = pid.strip()
+                if not pid:
+                    continue
+                qty_raw = quantities[idx] if idx < len(quantities) else ''
+                items_to_process.append((pid, qty_raw))
+        elif 'selected_products' in request.form:
+            for pid in request.form.getlist('selected_products'):
+                pid = pid.strip()
+                qty_raw = request.form.get(f'quantity_{pid}', '')
+                items_to_process.append((pid, qty_raw))
+
+        if not items_to_process:
+            flash("請由商品下拉選單至少選擇一項商品並填寫購買數量！", "danger")
+            conn.close()
+            return redirect(url_for('order_create'))
+
+        # 4. 數量必須為正整數 (需求 5 後端第二層驗證)
+        valid_items = []
+        for pid, qty_raw in items_to_process:
+            qty_str = str(qty_raw).strip()
+            # 必須為純整數字串且大於 0 (排除浮點數 1.5、0、負數及非數字)
+            if not qty_str.isdigit() or int(qty_str) <= 0:
+                flash(f"商品【{pid}】購買數量【{qty_raw}】不合法！數量必須為大於 0 的正整數。", "danger")
+                conn.close()
+                return redirect(url_for('order_create'))
+            valid_items.append((pid, int(qty_str)))
+
+        # 合併同商品的購買數量
+        combined_items = {}
+        for pid, qty in valid_items:
+            combined_items[pid] = combined_items.get(pid, 0) + qty
 
         if not order_date:
             order_date = datetime.now().strftime("%Y-%m-%d")
 
         try:
-            # 1. 寫入 orders 主表
+            # 1. 寫入 orders 主表 (參數化查詢)
             conn.execute(
                 "INSERT INTO orders (order_id, customer_id, order_date, status, salesperson) VALUES (?, ?, ?, ?, ?)",
                 (order_id, customer_id, order_date, status, salesperson)
             )
 
-            # 2. 處理勾選的商品，存入當下的單價 (Snapshot Price)
-            for pid in selected_products:
-                qty_raw = request.form.get(f'quantity_{pid}', '1')
-                try:
-                    qty = int(qty_raw)
-                    if qty <= 0:
-                        qty = 1
-                except ValueError:
-                    qty = 1
-
-                # 查詢該商品當下的即時單價與庫存
+            # 2. 處理商品，存入當下單價 (Snapshot Price) 與扣減庫存
+            for pid, qty in combined_items.items():
                 prod = conn.execute("SELECT price, stock, name FROM product WHERE product_id = ?", (pid,)).fetchone()
                 if not prod:
-                    continue
+                    raise ValueError(f"找不到商品編號【{pid}】！")
 
-                snapshot_price = prod['price']  # 下單當時的商品單價
+                snapshot_price = prod['price']
 
-                # 寫入 order_item (複合主鍵)
+                # 寫入 order_item (需求 5 資料庫第三層 CHECK 約束防護)
                 conn.execute(
                     "INSERT INTO order_item (order_id, product_id, quantity, price) VALUES (?, ?, ?, ?)",
                     (order_id, pid, qty, snapshot_price)
@@ -512,11 +665,11 @@ def order_create():
     customers = conn.execute("SELECT customer_id, name, phone, address FROM customer ORDER BY customer_id ASC").fetchall()
     products = conn.execute("SELECT product_id, name, price, stock, category FROM product ORDER BY product_id ASC").fetchall()
 
-    # 自動推算新訂單編號
+    # 自動推算新訂單編號 (格式: SO + 8碼日期 + 3碼流水號)
     today_str = datetime.now().strftime("%Y-%m-%d")
     today_code = datetime.now().strftime("%Y%m%d")
     count_today = conn.execute("SELECT COUNT(*) FROM orders WHERE order_date = ?", (today_str,)).fetchone()[0] + 1
-    new_order_id = f"ORD-{today_code}-{count_today:03d}"
+    new_order_id = f"SO{today_code}{count_today:03d}"
 
     conn.close()
     return render_template(
@@ -666,7 +819,7 @@ if __name__ == '__main__':
     print("==================================================")
     print("OrderMaster Pro 訂單管理系統已啟動！")
     print("本機瀏覽網址: http://127.0.0.1:5000 或 http://localhost:5000")
-    print("預設管理員帳號：admin  密碼：admin123")
+    print("系統管理員帳號：admin（密碼已透過 Werkzeug 安全雜湊加密儲存）")
     print("==================================================")
     app.run(debug=True, host='0.0.0.0', port=5000)
 

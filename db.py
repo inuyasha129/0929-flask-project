@@ -4,6 +4,12 @@ from werkzeug.security import generate_password_hash
 
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'order_system.db')
 
+# 預設管理員密碼之 Werkzeug scrypt 安全雜湊（原始碼與畫面均不存放明碼）
+DEFAULT_ADMIN_HASH = os.environ.get(
+    'ADMIN_PASSWORD_HASH',
+    'scrypt:32768:8:1$1f2MWiZARdlU91Y6$0c9c1826cad242fbbfa2af4928c2c5af0bf90e5b86e6980c6ad56ae9533caf3532190f6f68b80257013efa5ae32a0f1cd4490c188e5b6bb5313e8bf7b7f6c844'
+)
+
 def get_db_connection():
     """建立並取得 SQLite 資料庫連線，設定 Row Factory 與外鍵約束"""
     conn = sqlite3.connect(DB_PATH)
@@ -16,14 +22,22 @@ def init_db():
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # 1. 建立管理員資料表
+    # 1. 建立管理員資料表 (含角色欄位 role)
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS admin (
         username TEXT PRIMARY KEY,
         password_hash TEXT NOT NULL,
-        name TEXT NOT NULL
+        name TEXT NOT NULL,
+        role TEXT NOT NULL DEFAULT 'admin'
     );
     ''')
+
+    # 確保現有 admin 資料表具備 role 欄位
+    cursor.execute("PRAGMA table_info(admin);")
+    admin_columns = [col[1] for col in cursor.fetchall()]
+    if 'role' not in admin_columns:
+        cursor.execute("ALTER TABLE admin ADD COLUMN role TEXT NOT NULL DEFAULT 'admin';")
+        cursor.execute("UPDATE admin SET role = 'admin' WHERE role IS NULL OR role = '';")
 
     # 2. 建立客戶資料表 (customer)
     cursor.execute('''
@@ -61,12 +75,12 @@ def init_db():
     );
     ''')
 
-    # 5. 建立訂單明細資料表 (order_item) - 複合主鍵，存下單當時單價
+    # 5. 建立訂單明細資料表 (order_item) - 數量三層防護之資料庫 CHECK (必須為正整數)
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS order_item (
         order_id TEXT NOT NULL,
         product_id TEXT NOT NULL,
-        quantity INTEGER NOT NULL CHECK(quantity > 0),
+        quantity INTEGER NOT NULL CHECK(quantity > 0 AND TYPEOF(quantity) = 'integer'),
         price REAL NOT NULL CHECK(price >= 0),
         PRIMARY KEY (order_id, product_id),
         FOREIGN KEY (order_id) REFERENCES orders (order_id) ON DELETE CASCADE,
@@ -74,12 +88,33 @@ def init_db():
     );
     ''')
 
-    # 檢查是否需要插入初始管理員資料
+    # 檢查現有 order_item 是否已升級 TYPEOF(quantity) 檢查約束，若未升級則進行安全轉移
+    cursor.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='order_item';")
+    oi_row = cursor.fetchone()
+    if oi_row and 'TYPEOF' not in oi_row[0]:
+        cursor.execute("PRAGMA foreign_keys = OFF;")
+        cursor.execute("ALTER TABLE order_item RENAME TO order_item_old;")
+        cursor.execute('''
+        CREATE TABLE order_item (
+            order_id TEXT NOT NULL,
+            product_id TEXT NOT NULL,
+            quantity INTEGER NOT NULL CHECK(quantity > 0 AND TYPEOF(quantity) = 'integer'),
+            price REAL NOT NULL CHECK(price >= 0),
+            PRIMARY KEY (order_id, product_id),
+            FOREIGN KEY (order_id) REFERENCES orders (order_id) ON DELETE CASCADE,
+            FOREIGN KEY (product_id) REFERENCES product (product_id) ON DELETE RESTRICT
+        );
+        ''')
+        cursor.execute("INSERT INTO order_item SELECT * FROM order_item_old;")
+        cursor.execute("DROP TABLE order_item_old;")
+        cursor.execute("PRAGMA foreign_keys = ON;")
+
+    # 檢查是否需要插入初始管理員資料 (使用 Werkzeug 安全雜湊，程式碼無明碼)
     cursor.execute("SELECT COUNT(*) FROM admin;")
     if cursor.fetchone()[0] == 0:
         cursor.execute(
-            "INSERT INTO admin (username, password_hash, name) VALUES (?, ?, ?)",
-            ('admin', generate_password_hash('admin123'), '系統管理員')
+            "INSERT INTO admin (username, password_hash, name, role) VALUES (?, ?, ?, ?)",
+            ('admin', DEFAULT_ADMIN_HASH, '系統管理員', 'admin')
         )
 
     # 檢查是否需要插入客戶測試資料 (5 筆繁體中文)

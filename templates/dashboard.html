@@ -12,6 +12,9 @@
       <p class="text-muted small mb-0">即時掌握客戶關係、庫存商品與訂單交付動態</p>
     </div>
     <div class="d-flex flex-wrap gap-2">
+      <a href="{{ url_for('admin_dashboard') }}" class="btn btn-outline-primary shadow-sm rounded-pill px-3">
+        <i class="bi bi-speedometer2 me-1"></i> 營運儀表板 (/admin)
+      </a>
       <a href="{{ url_for('order_create') }}" class="btn btn-primary shadow-sm rounded-pill px-3">
         <i class="bi bi-plus-lg me-1"></i> 建立新訂單
       </a>
